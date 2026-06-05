@@ -702,7 +702,9 @@ require("lazy").setup({
 			--  - settings (table): Override the default settings passed when initializing the server.
 			--        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
 			local servers = {
-				-- clangd = {},
+				-- clangd is installed system-wide via `apt install clangd-19` (Mason has no
+				-- aarch64 prebuilt). Override cmd so lspconfig invokes the versioned binary.
+				clangd = { cmd = { "clangd-19", "--background-index" } },
 				-- gopls = {},
 				-- pyright = {},
 				rust_analyzer = {},
@@ -745,6 +747,10 @@ require("lazy").setup({
 			-- You can add other tools here that you want Mason to install
 			-- for you, so that they are available from within Neovim.
 			local ensure_installed = vim.tbl_keys(servers or {})
+			-- clangd is installed via apt (no aarch64 prebuilt in Mason); skip Mason-installing it.
+			ensure_installed = vim.tbl_filter(function(name)
+				return name ~= "clangd"
+			end, ensure_installed)
 			vim.list_extend(ensure_installed, {
 				"stylua", -- Used to format Lua code
 			})
@@ -764,6 +770,16 @@ require("lazy").setup({
 					end,
 				},
 			})
+
+			-- mason-lspconfig's handler only fires for servers Mason itself installed; clangd
+			-- is system-installed via apt (no aarch64 prebuilt in Mason), so set it up here
+			-- directly so its FileType autocmds get registered.
+			if servers.clangd then
+				local clangd_cfg = vim.tbl_deep_extend("force", {}, servers.clangd)
+				clangd_cfg.capabilities =
+					vim.tbl_deep_extend("force", {}, capabilities, clangd_cfg.capabilities or {})
+				require("lspconfig").clangd.setup(clangd_cfg)
+			end
 		end,
 	},
 
