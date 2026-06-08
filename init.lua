@@ -759,27 +759,16 @@ require("lazy").setup({
 			require("mason-lspconfig").setup({
 				ensure_installed = {}, -- explicitly set to an empty table (Kickstart populates installs via mason-tool-installer)
 				automatic_installation = false,
-				handlers = {
-					function(server_name)
-						local server = servers[server_name] or {}
-						-- This handles overriding only values explicitly passed
-						-- by the server configuration above. Useful when disabling
-						-- certain features of an LSP (for example, turning off formatting for ts_ls)
-						server.capabilities = vim.tbl_deep_extend("force", {}, capabilities, server.capabilities or {})
-						require("lspconfig")[server_name].setup(server)
-					end,
-				},
 			})
 
-			-- mason-lspconfig's handler only fires for servers Mason itself installed; clangd
-			-- is system-installed via apt (no aarch64 prebuilt in Mason), so set it up here
-			-- directly so its FileType autocmds get registered.
-			if servers.clangd then
-				local clangd_cfg = vim.tbl_deep_extend("force", {}, servers.clangd)
-				clangd_cfg.capabilities =
-					vim.tbl_deep_extend("force", {}, capabilities, clangd_cfg.capabilities or {})
-				require("lspconfig").clangd.setup(clangd_cfg)
+			-- Configure every server via the nvim 0.11 vim.lsp API (replaces the deprecated
+			-- lspconfig handlers + setup()). Covers Mason-installed and system-installed
+			-- servers alike (e.g. clangd: apt clangd-19, no aarch64 prebuilt in Mason).
+			for server_name, server in pairs(servers) do
+				server.capabilities = vim.tbl_deep_extend("force", {}, capabilities, server.capabilities or {})
+				vim.lsp.config(server_name, server)
 			end
+			vim.lsp.enable(vim.tbl_keys(servers))
 		end,
 	},
 
